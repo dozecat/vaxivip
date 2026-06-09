@@ -18,6 +18,7 @@
 | **`axis`** (`src/axis/`) | AXI4-Stream | Master/Slave interface | AXI-Stream timing verification |
 | **`axis_image`** (`src/axis_image/`) | AXI4-Stream | Bidirectional conversion between BMP images and AXI4-Stream, supports RGB format (Xilinx AXI4-Stream Video compliant) | Image processing IP verification |
 | **`axis_video`** (`src/axis_video/`) | AXI4-Stream | Bidirectional conversion between planar video frames and AXI4-Stream, supports YUV444/422/420 formats (Xilinx AXI4-Stream Video compliant) | Video processing IP verification |
+| **`clock_gen` / `sim_coop`** (`src/`) | Simulation Utility | Software clock generation + protothread-based cooperative scheduler for multi-clock simulation | Verilator testbench with async clock domains |
 
 ## 🚀 Quick Start
 
@@ -67,7 +68,9 @@ make clean
 │   ├── axis_image/     # AXI4-Stream image: axis_image.hpp, axis_image_*.hpp, bmp.hpp
 │   ├── axis_video/     # AXI4-Stream video: axis_video.hpp, axis_video_*.hpp, frame_mem.hpp, pix_fmt.hpp
 │   ├── log.hpp         # Shared logging
-│   └── sig.hpp         # Shared signal helpers
+│   ├── sig.hpp         # Shared signal helpers
+│   ├── clock_gen.hpp   # Software clock generator for async clock simulation
+│   └── sim_coop.hpp    # Protothread-based cooperative simulation scheduler
 ├── tb/                 # Testbenches and examples
 │   ├── axi/            # AXI4 tests
 │   ├── axil/           # AXI4-Lite tests
@@ -89,6 +92,8 @@ Add each relevant directory under `src/` to your compiler include path (e.g. `-I
 #include "axis.hpp"       // AXI4-Stream VIP
 #include "axis_image.hpp" // AXI4-Stream image VIP
 #include "axis_video.hpp" // AXI4-Stream video VIP
+#include "clock_gen.hpp"  // Software clock generator (optional)
+#include "sim_coop.hpp"   // Protothread simulation engine (optional)
 ```
 
 ### 2. Bind Signals
@@ -242,7 +247,8 @@ Copyright (c) 2025 dozecat
 | **`axil`**（`src/axil/`）             | AXI4-Lite   | Master/Slave接口                                             | axi4-lite寄存器访问验证 |
 | **`axis`**（`src/axis/`）             | AXI4-Stream | Master/Slave接口                                             | axi-stream时序验证      |
 | **`axis_image`**（`src/axis_image/`） | AXI4-Stream | BMP图像与AXI4-Stream双向转换，支持RGB格式（遵循Xilinx AXI4-Stream Video标准） | 图像处理IP验证          |
-| **`axis_video`**（`src/axis_video/`） | AXI4-Stream | 平面视频帧与AXI4-Stream双向转换，支持YUV444/YUV422/YUV420格式（遵循Xilinx AXI4-Stream Video标准） | 视频处理IP验证          |
+| **`axis_video`**（`src/axis_video/`） | AXI4-Stream | 平面视频帧与AXI4-Stream双向转换，支持YUV444/YUV422/YUV420格式（遵循Xilinx AXI4-Stream Video标准） | 视频处理IP验证 |
+| **`clock_gen` / `sim_coop`**（`src/`） | 仿真工具 | 软件时钟生成 + 基于protothread的协作调度器，支持多时钟域异步仿真 | Verilator多时钟域测试平台 |
 
 ## 🚀 快速开始
 
@@ -290,7 +296,9 @@ make clean
 │   ├── axis_image/     # AXI4-Stream 图像：axis_image.hpp, axis_image_*.hpp, bmp.hpp
 │   ├── axis_video/     # AXI4-Stream 视频：axis_video.hpp, axis_video_*.hpp, frame_mem.hpp, pix_fmt.hpp
 │   ├── log.hpp         # 公共日志
-│   └── sig.hpp         # 公共信号辅助
+│   ├── sig.hpp         # 公共信号辅助
+│   ├── clock_gen.hpp   # 异步时钟信号软件生成器
+│   └── sim_coop.hpp    # 基于protothread的协作式仿真调度器
 ├── tb/                 # 测试用例和示例
 │   ├── axi/            # AXI4 测试
 │   ├── axil/           # AXI4-Lite 测试
@@ -312,6 +320,8 @@ make clean
 #include "axis.hpp"      // AXI4-Stream VIP
 #include "axis_image.hpp" // AXI4-Stream 图像 VIP
 #include "axis_video.hpp" // AXI4-Stream 视频 VIP
+#include "clock_gen.hpp"  // 软件时钟生成器（可选）
+#include "sim_coop.hpp"   // Protothread仿真引擎（可选）
 ```
 
 ### 2. 绑定信号
