@@ -2,7 +2,7 @@
  * Copyright (C) 2025 dozecat. All rights reserved.
  * SPDX-License-Identifier: MIT
  *
- * @file        axis_prt.hpp
+ * @file        axis_ptr.hpp
  * @brief       AXI4-Stream Interface Definitions
  * @see         https://github.com/dozecat/vaxivip
  *
@@ -15,8 +15,8 @@
  * 1.0        2025/12/25  Initial release
  ******************************************************************************/
 
-#ifndef AXIS_PRT_HPP
-#define AXIS_PRT_HPP
+#ifndef AXIS_PTR_HPP
+#define AXIS_PTR_HPP
 #include <cstdint>
 #include <cstring>
 #include "sig.hpp"

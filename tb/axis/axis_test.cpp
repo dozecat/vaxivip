@@ -6,7 +6,7 @@
  * @brief       AXI4-Stream Testbench (C++)
  * @see         https://github.com/dozecat/vaxivip
  *
- * @details     Verilator C++ TB for AXI4-Stream. VIP: `src/axis/axis_prt.hpp`, `src/axis/axis.hpp`
+ * @details     Verilator C++ TB for AXI4-Stream. VIP: `src/axis/axis_ptr.hpp`, `src/axis/axis.hpp`
  *              (include dirs from `tb/axis/Makefile`).
  *
  * Modification History:
@@ -21,7 +21,7 @@
 #include "verilated_vcd_c.h"
 #include <svdpi.h>
 #include <iostream>
-#include "axis_prt.hpp"
+#include "axis_ptr.hpp"
 #include "axis.hpp"
 
 /**

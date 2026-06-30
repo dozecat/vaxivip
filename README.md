@@ -64,7 +64,7 @@ make clean
 ├── src/                # VIP source code
 │   ├── axi/            # AXI4: axi_ptr.hpp, axi.hpp, axi_master.hpp, axi_slave.hpp, axi_common.hpp
 │   ├── axil/           # AXI4-Lite: axil_ptr.hpp, axil.hpp, axil_master.hpp, axil_slave.hpp
-│   ├── axis/           # AXI4-Stream: axis_prt.hpp, axis.hpp, axis_master.hpp, axis_slave.hpp
+│   ├── axis/           # AXI4-Stream: axis_ptr.hpp, axis.hpp, axis_master.hpp, axis_slave.hpp
 │   ├── axis_image/     # AXI4-Stream image: axis_image.hpp, axis_image_*.hpp, bmp.hpp
 │   ├── axis_video/     # AXI4-Stream video: axis_video.hpp, axis_video_*.hpp, frame_mem.hpp, pix_fmt.hpp
 │   ├── log.hpp         # Shared logging
@@ -88,7 +88,7 @@ Add each relevant directory under `src/` to your compiler include path (e.g. `-I
 #include "axi.hpp"        // AXI4 VIP (master + slave)
 #include "axil_ptr.hpp"
 #include "axil.hpp"       // AXI4-Lite VIP
-#include "axis_prt.hpp"   // AXI4-Stream signal structs (optional)
+#include "axis_ptr.hpp"   // AXI4-Stream signal structs (optional)
 #include "axis.hpp"       // AXI4-Stream VIP
 #include "axis_image.hpp" // AXI4-Stream image VIP
 #include "axis_video.hpp" // AXI4-Stream video VIP
@@ -292,7 +292,7 @@ make clean
 ├── src/                # VIP源代码
 │   ├── axi/            # AXI4：axi_ptr.hpp, axi.hpp, axi_master.hpp, axi_slave.hpp, axi_common.hpp
 │   ├── axil/           # AXI4-Lite：axil_ptr.hpp, axil.hpp, axil_master.hpp, axil_slave.hpp
-│   ├── axis/           # AXI4-Stream：axis_prt.hpp, axis.hpp, axis_master.hpp, axis_slave.hpp
+│   ├── axis/           # AXI4-Stream：axis_ptr.hpp, axis.hpp, axis_master.hpp, axis_slave.hpp
 │   ├── axis_image/     # AXI4-Stream 图像：axis_image.hpp, axis_image_*.hpp, bmp.hpp
 │   ├── axis_video/     # AXI4-Stream 视频：axis_video.hpp, axis_video_*.hpp, frame_mem.hpp, pix_fmt.hpp
 │   ├── log.hpp         # 公共日志
@@ -316,7 +316,7 @@ make clean
 #include "axi.hpp"       // AXI4 VIP
 #include "axil_ptr.hpp"
 #include "axil.hpp"      // AXI4-Lite VIP
-#include "axis_prt.hpp"  // AXI4-Stream 信号结构（可省略）
+#include "axis_ptr.hpp"  // AXI4-Stream 信号结构（可省略）
 #include "axis.hpp"      // AXI4-Stream VIP
 #include "axis_image.hpp" // AXI4-Stream 图像 VIP
 #include "axis_video.hpp" // AXI4-Stream 视频 VIP

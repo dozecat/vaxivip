@@ -17,7 +17,7 @@
 #ifndef AXIS_SLAVE_HPP
 #define AXIS_SLAVE_HPP
 
-#include "axis_prt.hpp"
+#include "axis_ptr.hpp"
 #include "log.hpp"
 #include <cstring>
 #include <queue>

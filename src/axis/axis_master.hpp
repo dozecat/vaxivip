@@ -17,7 +17,7 @@
 #ifndef AXIS_MASTER_HPP
 #define AXIS_MASTER_HPP
 
-#include "axis_prt.hpp"
+#include "axis_ptr.hpp"
 #include "log.hpp"
 #include <cstring>
 #include <queue>
