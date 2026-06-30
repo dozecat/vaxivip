@@ -80,80 +80,6 @@ public:
         return true;
     }
 
-private:
-    std::queue<uint64_t> wr_data_q;
-    std::queue<uint64_t> wr_addr_q;
-    std::queue<uint64_t> rd_addr_q;
-    std::queue<uint64_t> rd_data_q;
-
-    bool wr_active;
-    bool rd_active;
-
-    bool aw_hs, w_hs, b_hs, ar_hs, r_hs;
-
-    uint64_t current_wr_addr;
-    uint64_t current_wr_data;
-    uint64_t current_rd_addr;
-
-    bool awready_i;
-    bool wready_i;
-    bool bvalid_i;
-    uint8_t bresp_i;
-    bool arready_i;
-    bool rvalid_i;
-    uint64_t rdata_i;
-    uint8_t rresp_i;
-
-    void waddr_set(uint64_t addr) {
-        *(port.awaddr)  = addr;
-        *(port.awvalid) = true;
-    }
-
-    void waddr_clr() {
-        *(port.awaddr)  = 0;
-        *(port.awvalid) = false;
-    }
-
-    void wdata_set(uint64_t data) {
-        *(port.wdata)   = data;
-        *(port.wstrb)   = (1ULL << (DATA_WIDTH / 8)) - 1; // Enable all bytes
-        *(port.wvalid)  = true;
-    }
-
-    void wdata_clr() {
-        *(port.wdata)   = 0;
-        *(port.wstrb)   = 0;
-        *(port.wvalid)  = false;
-    }
-
-    void rresp_set() {
-        *(port.bready)  = true;
-    }
-
-    void rresp_clr() {
-        *(port.bready)  = false;
-        wr_active = false;
-    }
-
-    void raddr_set(uint64_t addr) {
-        *(port.araddr)  = addr;
-        *(port.arvalid) = true;
-    }
-
-    void raddr_clr() {
-        *(port.araddr)  = 0;
-        *(port.arvalid) = false;
-    }
-
-    void rdata_set() {
-        *(port.rready)  = true;
-    }
-
-    void rdata_clr() {
-        *(port.rready)  = false;
-        rd_active = false;
-    }
-
     /// @brief Cycle tick
     void update_input() {
         awready_i = *(port.awready);
@@ -234,6 +160,81 @@ private:
             raddr_set(addr);
         }
     }
+
+private:
+    std::queue<uint64_t> wr_data_q;
+    std::queue<uint64_t> wr_addr_q;
+    std::queue<uint64_t> rd_addr_q;
+    std::queue<uint64_t> rd_data_q;
+
+    bool wr_active;
+    bool rd_active;
+
+    bool aw_hs, w_hs, b_hs, ar_hs, r_hs;
+
+    uint64_t current_wr_addr;
+    uint64_t current_wr_data;
+    uint64_t current_rd_addr;
+
+    bool awready_i;
+    bool wready_i;
+    bool bvalid_i;
+    uint8_t bresp_i;
+    bool arready_i;
+    bool rvalid_i;
+    uint64_t rdata_i;
+    uint8_t rresp_i;
+
+    void waddr_set(uint64_t addr) {
+        *(port.awaddr)  = addr;
+        *(port.awvalid) = true;
+    }
+
+    void waddr_clr() {
+        *(port.awaddr)  = 0;
+        *(port.awvalid) = false;
+    }
+
+    void wdata_set(uint64_t data) {
+        *(port.wdata)   = data;
+        *(port.wstrb)   = (1ULL << (DATA_WIDTH / 8)) - 1; // Enable all bytes
+        *(port.wvalid)  = true;
+    }
+
+    void wdata_clr() {
+        *(port.wdata)   = 0;
+        *(port.wstrb)   = 0;
+        *(port.wvalid)  = false;
+    }
+
+    void rresp_set() {
+        *(port.bready)  = true;
+    }
+
+    void rresp_clr() {
+        *(port.bready)  = false;
+        wr_active = false;
+    }
+
+    void raddr_set(uint64_t addr) {
+        *(port.araddr)  = addr;
+        *(port.arvalid) = true;
+    }
+
+    void raddr_clr() {
+        *(port.araddr)  = 0;
+        *(port.arvalid) = false;
+    }
+
+    void rdata_set() {
+        *(port.rready)  = true;
+    }
+
+    void rdata_clr() {
+        *(port.rready)  = false;
+        rd_active = false;
+    }
+
 };
 
 #endif
