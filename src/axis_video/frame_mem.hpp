@@ -20,14 +20,13 @@
 #ifndef FRAME_MEM_HPP
 #define FRAME_MEM_HPP
 
+#include "pix_fmt.hpp"
+#include "video_info.hpp"
 #include <array>
 #include <cstddef>
 #include <cstdint>
 #include <string>
 #include <vector>
-
-#include "pix_fmt.hpp"
-#include "video_info.hpp"
 
 /**
  * @brief Frame information structure extending VideoInfo with pixel format
@@ -36,7 +35,7 @@
  */
 class FrameInfo : public VideoInfo {
 public:
-    PixlFmt pix_fmt;
+    PixFmt pix_fmt;
     AxisPixFmt axis_pix_fmt() const { return pix_fmt_axis_pack(pix_fmt); }
     /// Get plane width for given plane index
     uint32_t plane_width(uint32_t plane_index) const;
@@ -56,13 +55,6 @@ public:
  *          data with configurable color depth and pixel format.
  */
 class FrameMem {
-private:
-    FrameInfo info_;
-    std::array<std::vector<uint16_t>, 3> planes_;
-
-    /// Calculate memory offset for pixel access
-    std::size_t plane_offset(uint32_t frame_index, uint32_t plane_index, uint32_t y, uint32_t x) const;
-
 public:
     /// Destructor
     ~FrameMem();
@@ -72,7 +64,7 @@ public:
     /// Initialize frame memory with given frame information
     bool init(const FrameInfo& info);
     /// Get current frame information
-    const FrameInfo& info() const { return info_; }
+    const FrameInfo& info() const { return frame_info; }
 
     /// Read YUV planar frames from file
     bool read_file(const std::string& file_path, uint32_t start_frame = 0, uint32_t frame_num = 0);
@@ -88,6 +80,13 @@ public:
     uint16_t read_pixel(uint32_t frame_index, uint32_t plane_index, uint32_t x, uint32_t y) const;
     /// Write a single pixel sample to frame memory
     bool write_pixel(uint32_t frame_index, uint32_t plane_index, uint32_t x, uint32_t y, uint32_t value);
+
+private:
+    FrameInfo frame_info;
+    std::array<std::vector<uint16_t>, 3> planes;
+
+    /// Calculate memory offset for pixel access
+    std::size_t plane_offset(uint32_t frame_index, uint32_t plane_index, uint32_t y, uint32_t x) const;
 };
 
 #endif

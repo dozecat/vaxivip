@@ -56,7 +56,7 @@ public:
     }
 
     /// @brief Destructor
-    ~axis_video_master() { frames_.clear(); }
+    ~axis_video_master() { frames.clear(); }
 
     /// @brief Load and start sending YUV frames over AXI4-Stream
     /// @param filename Path to YUV file to load
@@ -100,11 +100,11 @@ public:
             return false;
         }
         frame_info = fi;
-        if (!frames_.init(fi)) {
+        if (!frames.init(fi)) {
             log.error("axis_video_master send_frames: FrameMem init failed");
             return false;
         }
-        if (!frames_.read_file(filename, start_frame, n)) {
+        if (!frames.read_file(filename, start_frame, n)) {
             log.error("axis_video_master send_frames: FrameMem read_file failed, file=", filename);
             return false;
         }
@@ -113,9 +113,9 @@ public:
                  ", start_frame=", start_frame,
                  ", frame_num=", n);
 
-        xfer_frame_total_ = n;
+        xfer_frame_total = n;
         busy = false;
-        lines_sent_ = 0;
+        lines_sent = 0;
         done = false;
         end_of_frame = false;
 
@@ -143,10 +143,10 @@ public:
         const bool tx_is_active = !axis_mst.tx_buf.empty();
         if (tx_was_active && !tx_is_active) {
             if (frame_info.height != 0) {
-                ++lines_sent_;
-                if ((lines_sent_ % frame_info.height) == 0) {
+                ++lines_sent;
+                if ((lines_sent % frame_info.height) == 0) {
                     end_of_frame = true;
-                    if (lines_sent_ / frame_info.height >= xfer_frame_total_)
+                    if (lines_sent / frame_info.height >= xfer_frame_total)
                         done = true;
                 }
             }
@@ -157,9 +157,9 @@ public:
     }
 
 private:
-    FrameMem frames_;
-    uint32_t lines_sent_ = 0;
-    uint32_t xfer_frame_total_ = 0;
+    FrameMem frames;
+    uint32_t lines_sent = 0;
+    uint32_t xfer_frame_total = 0;
 
     uint16_t sample_to_axis(uint16_t sample) const {
         const uint32_t cd = frame_info.color_depth;
@@ -186,10 +186,10 @@ private:
         constexpr uint32_t comp_per_beat = 3u * PPC;
         for (uint32_t y = 0; y < frame_info.height; ++y) {
             std::vector<uint16_t> ly, lu, lv;
-            frames_.read_line(frame_index, 0, y, ly);
+            frames.read_line(frame_index, 0, y, ly);
             const uint32_t cy = (frame_info.pix_fmt == PIX_FMT_YUV420P) ? (y / 2u) : y;
-            frames_.read_line(frame_index, 1, cy, lu);
-            frames_.read_line(frame_index, 2, cy, lv);
+            frames.read_line(frame_index, 1, cy, lu);
+            frames.read_line(frame_index, 2, cy, lv);
             const uint32_t nbeats = (frame_info.width + PPC - 1u) / PPC;
             std::vector<uint8_t> line_data;
             line_data.reserve(static_cast<size_t>(nbeats) * bytes_per_beat);

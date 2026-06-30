@@ -20,13 +20,13 @@
 #ifndef BMP_HPP
 #define BMP_HPP
 
+#include "image_info.hpp"
 #include <cstdint>
 #include <cstring>
 #include <fstream>
 #include <vector>
 #include <string>
 #include <stdexcept>
-#include "image_info.hpp"
 
 /**
  * @brief BMP image container with read/write capabilities
@@ -37,9 +37,6 @@ class Bitmap {
 public:
     /// @brief Image information
     ImageInfo image_info;
-    uint16_t bit_count;                        ///< Bits per pixel (24 or 32)
-
-    std::vector<std::vector<uint32_t>> data;   ///< Pixel data [height][width] in ARGB format
 
     /// @brief Default constructor
     Bitmap() {
@@ -233,6 +230,11 @@ public:
     /// @brief Create a new blank image with specified dimensions
     /// @param w Image width in pixels
     /// @param h Image height in pixels
+private:
+    uint16_t bit_count = 0;
+    std::vector<std::vector<uint32_t>> data;
+
+public:
     void create(uint32_t w, uint32_t h) {
         image_info.width = w;
         image_info.height = h;

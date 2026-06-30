@@ -26,7 +26,7 @@
  * @brief Pixel format enumeration
  * @details Defines supported pixel formats for video processing.
  */
-enum PixlFmt {
+enum PixFmt {
     PIX_FMT_NONE = -1,
     PIX_FMT_YUV444P = 0,   ///< planar YUV 4:4:4
     PIX_FMT_YUV422P = 1,   ///< planar YUV 4:2:2
@@ -35,7 +35,7 @@ enum PixlFmt {
     PIX_FMT_BGR24 = 4,     ///< packed RGB 8:8:8, 24bpp, BGRBGR...
 };
 
-inline constexpr AxisPixFmt pix_fmt_axis_pack(PixlFmt fmt) {
+inline constexpr AxisPixFmt pix_fmt_axis_pack(PixFmt fmt) {
     switch (fmt) {
     case PIX_FMT_NONE:
         return AXIS_PIX_FMT_NONE;

@@ -35,77 +35,6 @@ public:
 
     std::map<uint64_t, uint8_t> mem; // Byte-addressable memory
 
-    // State variables
-    bool aw_latch;
-    bool w_active;
-    uint64_t aw_addr;
-    uint32_t aw_len;
-    uint32_t aw_id;
-    uint8_t aw_burst;
-    uint32_t w_beat_count;
-    bool w_done_pending;
-    std::vector<uint8_t> w_data_accum;
-    bool w_wait_next;
-
-    bool ar_latch;
-    bool r_active;
-    uint64_t ar_addr;
-    uint32_t ar_len;
-    uint32_t ar_id;
-    uint8_t ar_burst;
-    uint32_t r_beat_count;
-    std::vector<uint8_t> r_data_accum;
-
-    // Registered inputs
-    sig_t(ADDR_WIDTH-1, 0) awaddr_i;
-    uint8_t awburst_i;
-    uint8_t awcache_i;
-    sig_t(ID_WIDTH-1, 0) awid_i;
-    uint8_t awlen_i;
-    uint8_t awlock_i;
-    uint8_t awprot_i;
-    uint8_t awqos_i;
-    uint8_t awregion_i;
-    uint8_t awsize_i;
-    bool awvalid_i;
-
-    sig_t(DATA_WIDTH-1, 0) wdata_i;
-    sig_t(ID_WIDTH-1, 0) wid_i;
-    bool wlast_i;
-    sig_t(DATA_WIDTH/8-1, 0) wstrb_i;
-    bool wvalid_i;
-
-    bool bready_i;
-
-    sig_t(ADDR_WIDTH-1, 0) araddr_i;
-    uint8_t arburst_i;
-    uint8_t arcache_i;
-    sig_t(ID_WIDTH-1, 0) arid_i;
-    uint8_t arlen_i;
-    uint8_t arlock_i;
-    uint8_t arprot_i;
-    uint8_t arqos_i;
-    uint8_t arregion_i;
-    uint8_t arsize_i;
-    bool arvalid_i;
-
-    bool rready_i;
-
-    /// @brief Calculate address for current beat
-    uint64_t get_addr(uint64_t start_addr, uint32_t beat, uint32_t len, uint8_t burst, size_t bytes_per_beat) {
-        if (burst == 0) { // FIXED
-            return start_addr;
-        } else if (burst == 1) { // INCR
-            return start_addr + beat * bytes_per_beat;
-        } else if (burst == 2) { // WRAP
-            uint64_t total_bytes = bytes_per_beat * (len + 1);
-            uint64_t lower_wrap_boundary = (start_addr / total_bytes) * total_bytes;
-            uint64_t current_offset = (start_addr % total_bytes) + (beat * bytes_per_beat);
-            return lower_wrap_boundary + (current_offset % total_bytes);
-        }
-        return start_addr;
-    }
-
     /// @brief Constructor
     /// @param port Interface signals pointer
     axi_slave(axi_slave_ptr<DATA_WIDTH, ADDR_WIDTH, ID_WIDTH> port) : port(port) {
@@ -360,6 +289,75 @@ public:
             bool last = (r_beat_count == ar_len);
             *(port.rlast) = last;
         }
+    }
+
+private:
+    bool aw_latch;
+    bool w_active;
+    uint64_t aw_addr;
+    uint32_t aw_len;
+    uint32_t aw_id;
+    uint8_t aw_burst;
+    uint32_t w_beat_count;
+    bool w_done_pending;
+    std::vector<uint8_t> w_data_accum;
+    bool w_wait_next;
+
+    bool ar_latch;
+    bool r_active;
+    uint64_t ar_addr;
+    uint32_t ar_len;
+    uint32_t ar_id;
+    uint8_t ar_burst;
+    uint32_t r_beat_count;
+    std::vector<uint8_t> r_data_accum;
+
+    sig_t(ADDR_WIDTH-1, 0) awaddr_i;
+    uint8_t awburst_i;
+    uint8_t awcache_i;
+    sig_t(ID_WIDTH-1, 0) awid_i;
+    uint8_t awlen_i;
+    uint8_t awlock_i;
+    uint8_t awprot_i;
+    uint8_t awqos_i;
+    uint8_t awregion_i;
+    uint8_t awsize_i;
+    bool awvalid_i;
+
+    sig_t(DATA_WIDTH-1, 0) wdata_i;
+    sig_t(ID_WIDTH-1, 0) wid_i;
+    bool wlast_i;
+    sig_t(DATA_WIDTH/8-1, 0) wstrb_i;
+    bool wvalid_i;
+
+    bool bready_i;
+
+    sig_t(ADDR_WIDTH-1, 0) araddr_i;
+    uint8_t arburst_i;
+    uint8_t arcache_i;
+    sig_t(ID_WIDTH-1, 0) arid_i;
+    uint8_t arlen_i;
+    uint8_t arlock_i;
+    uint8_t arprot_i;
+    uint8_t arqos_i;
+    uint8_t arregion_i;
+    uint8_t arsize_i;
+    bool arvalid_i;
+
+    bool rready_i;
+
+    uint64_t get_addr(uint64_t start_addr, uint32_t beat, uint32_t len, uint8_t burst, size_t bytes_per_beat) {
+        if (burst == 0) {
+            return start_addr;
+        } else if (burst == 1) {
+            return start_addr + beat * bytes_per_beat;
+        } else if (burst == 2) {
+            uint64_t total_bytes = bytes_per_beat * (len + 1);
+            uint64_t lower_wrap_boundary = (start_addr / total_bytes) * total_bytes;
+            uint64_t current_offset = (start_addr % total_bytes) + (beat * bytes_per_beat);
+            return lower_wrap_boundary + (current_offset % total_bytes);
+        }
+        return start_addr;
     }
 };
 

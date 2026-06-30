@@ -88,61 +88,61 @@ public:
 
     /// Register a clock domain; returns clock index
     int add_clock(const std::string& name, double freq_mhz, CData* sig) {
-        for (size_t i = 0; i < clocks_.size(); i++)
-            if (clocks_[i].name == name)
+        for (size_t i = 0; i < clocks.size(); i++)
+            if (clocks[i].name == name)
                 throw std::runtime_error("SimCoop: duplicate clock '" + name + "'");
-        clocks_.push_back({name, ClockGen<TSTEP_PS>{}});
-        clocks_.back().gen.init(freq_mhz, sig);
-        return (int)clocks_.size() - 1;
+        clocks.push_back({name, ClockGen<TSTEP_PS>{}});
+        clocks.back().gen.init(freq_mhz, sig);
+        return (int)clocks.size() - 1;
     }
 
     /// Register a protothread task on a clock domain
     void add_task(const std::string& name, int clock_idx,
                   std::function<void(PtCtx&)> fn) {
         check_clock_idx(clock_idx);
-        tasks_.push_back({name, clock_idx, std::move(fn), PtCtx{}});
+        tasks.push_back({name, clock_idx, std::move(fn), PtCtx{}});
     }
 
     /// Register pre-eval callback (BFM update_input)
     void add_sample_cb(int clock_idx, std::function<void(vluint64_t)> fn) {
         check_clock_idx(clock_idx);
-        sample_cbs_.push_back({clock_idx, std::move(fn)});
+        sample_cbs.push_back({clock_idx, std::move(fn)});
     }
 
     /// Register post-eval callback (BFM update_output)
     void add_drive_cb(int clock_idx, std::function<void(vluint64_t)> fn) {
         check_clock_idx(clock_idx);
-        drive_cbs_.push_back({clock_idx, std::move(fn)});
+        drive_cbs.push_back({clock_idx, std::move(fn)});
     }
 
-    void stop() { stop_ = true; }
+    void stop() { stopped = true; }
 
     /// Run simulation for max_time_ps picoseconds
     void run(vluint64_t max_time_ps) {
         if (!top) return;
 
         vluint64_t time = 0;
-        std::vector<bool> clk_edges(clocks_.size(), false);
+        std::vector<bool> clk_edges(clocks.size(), false);
 
-        while (!stop_ && !Verilated::gotFinish() && time < max_time_ps) {
-            for (size_t i = 0; i < clocks_.size(); i++)
-                clk_edges[i] = clocks_[i].gen.pedge(time);
+        while (!stopped && !Verilated::gotFinish() && time < max_time_ps) {
+            for (size_t i = 0; i < clocks.size(); i++)
+                clk_edges[i] = clocks[i].gen.pedge(time);
 
-            for (size_t i = 0; i < sample_cbs_.size(); i++)
-                if (clk_edges[sample_cbs_[i].clock_idx]) sample_cbs_[i].fn(time);
+            for (size_t i = 0; i < sample_cbs.size(); i++)
+                if (clk_edges[sample_cbs[i].clock_idx]) sample_cbs[i].fn(time);
 
-            for (size_t i = 0; i < tasks_.size(); i++)
-                if (clk_edges[tasks_[i].clock_idx]) {
-                    tasks_[i].ctx.on_edge = true;
-                    tasks_[i].ctx.time_ps = time;
-                    tasks_[i].fn(tasks_[i].ctx);
-                    tasks_[i].ctx.on_edge = false;
+            for (size_t i = 0; i < tasks.size(); i++)
+                if (clk_edges[tasks[i].clock_idx]) {
+                    tasks[i].ctx.on_edge = true;
+                    tasks[i].ctx.time_ps = time;
+                    tasks[i].fn(tasks[i].ctx);
+                    tasks[i].ctx.on_edge = false;
                 }
 
             top->eval();
 
-            for (size_t i = 0; i < drive_cbs_.size(); i++)
-                if (clk_edges[drive_cbs_[i].clock_idx]) drive_cbs_[i].fn(time);
+            for (size_t i = 0; i < drive_cbs.size(); i++)
+                if (clk_edges[drive_cbs[i].clock_idx]) drive_cbs[i].fn(time);
 
             if (tfp) tfp->dump(time);
             time += TSTEP_PS;
@@ -170,16 +170,16 @@ private:
     };
 
     void check_clock_idx(int idx) const {
-        if (idx < 0 || idx >= (int)clocks_.size())
+        if (idx < 0 || idx >= (int)clocks.size())
             throw std::runtime_error("SimCoop: invalid clock index " +
                                      std::to_string(idx));
     }
 
-    std::vector<ClockDesc>    clocks_;
-    std::vector<TaskDesc>     tasks_;
-    std::vector<CallbackDesc> sample_cbs_;
-    std::vector<CallbackDesc> drive_cbs_;
-    bool                      stop_ = false;
+    std::vector<ClockDesc>    clocks;
+    std::vector<TaskDesc>     tasks;
+    std::vector<CallbackDesc> sample_cbs;
+    std::vector<CallbackDesc> drive_cbs;
+    bool                      stopped = false;
 };
 
 #endif

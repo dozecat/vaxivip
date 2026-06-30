@@ -48,11 +48,6 @@ public:
     axis_slave<DATA_WIDTH, 1, 1, USER_WIDTH> axis_slv;
 
     Log log;
-    Bitmap bmp;
-    ImageInfo* image_info;
-    std::string filename;
-    uint32_t pixel_idx;
-    bool busy;
 
     /// @brief Constructor
     /// @param port AXI4-Stream slave interface pointer
@@ -187,6 +182,14 @@ public:
         }
     }
 
+private:
+    Bitmap bmp;
+    ImageInfo* image_info;
+    std::string filename;
+    uint32_t pixel_idx = 0;
+    bool busy = false;
+
+public:
     /// @brief Write received image to BMP file
     /// @param filename Path to output BMP file
     /// @return true if BMP saved successfully, false otherwise

@@ -50,9 +50,9 @@
 
 enum AxisPixFmt : uint32_t {
     AXIS_PIX_FMT_NONE = 0,
-    AXIS_PIX_FMT_GBR  = 0,
     AXIS_PIX_FMT_YUV  = 1,
-    AXIS_PIX_FMT_YUYV = 2
+    AXIS_PIX_FMT_YUYV = 2,
+    AXIS_PIX_FMT_GBR  = 3
 };
 
 /**

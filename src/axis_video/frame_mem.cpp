@@ -30,9 +30,9 @@ FrameMem::~FrameMem() {
 
 // Clear all frame data
 void FrameMem::clear() {
-    for (auto& pl : planes_)
+    for (auto& pl : planes)
         pl.clear();
-    info_ = FrameInfo{};
+    frame_info = FrameInfo{};
 }
 
 // Get plane width for given plane index
@@ -86,8 +86,8 @@ std::size_t FrameInfo::plane_samples(uint32_t plane_index) const {
 
 // Calculate memory offset for pixel access
 std::size_t FrameMem::plane_offset(uint32_t frame_index, uint32_t plane_index, uint32_t y, uint32_t x) const {
-    const std::size_t stride = info_.plane_samples(plane_index);
-    return static_cast<std::size_t>(frame_index) * stride + static_cast<std::size_t>(y) * info_.plane_width(plane_index) +
+    const std::size_t stride = frame_info.plane_samples(plane_index);
+    return static_cast<std::size_t>(frame_index) * stride + static_cast<std::size_t>(y) * frame_info.plane_width(plane_index) +
            x;
 }
 
@@ -99,31 +99,31 @@ bool FrameMem::init(const FrameInfo& info) {
         return false;
     if (info.pix_fmt == PIX_FMT_YUV420P && ((info.width & 1u) || (info.height & 1u)))
         return false;
-    info_ = info;
+    frame_info = info;
     for (uint32_t p = 0; p < 3; ++p) {
-        if (!info_.plane_ok(p)) {
-            for (auto& pl : planes_)
+        if (!frame_info.plane_ok(p)) {
+            for (auto& pl : planes)
                 pl.clear();
             return false;
         }
     }
     for (uint32_t p = 0; p < 3; ++p)
-        planes_[p].resize(static_cast<size_t>(info_.frame_total) * info_.plane_samples(p));
+        planes[p].resize(static_cast<size_t>(frame_info.frame_total) * frame_info.plane_samples(p));
     return true;
 }
 
 // Read YUV planar frames from file
 bool FrameMem::read_file(const std::string& file_path, uint32_t start_frame, uint32_t frame_num) {
-    const uint32_t n = frame_num ? frame_num : info_.frame_total;
-    if (n == 0 || n > info_.frame_total)
+    const uint32_t n = frame_num ? frame_num : frame_info.frame_total;
+    if (n == 0 || n > frame_info.frame_total)
         return false;
     FILE* fp = std::fopen(file_path.c_str(), "rb");
     if (!fp)
         return false;
-    const bool planar8 = info_.color_depth == static_cast<uint32_t>(COLOR_DEPTH_8);
+    const bool planar8 = frame_info.color_depth == static_cast<uint32_t>(COLOR_DEPTH_8);
     const uint64_t frame_bytes =
-        planar8 ? static_cast<uint64_t>(info_.plane_total())
-                : static_cast<uint64_t>(info_.plane_total()) * sizeof(uint16_t);
+        planar8 ? static_cast<uint64_t>(frame_info.plane_total())
+                : static_cast<uint64_t>(frame_info.plane_total()) * sizeof(uint16_t);
     const uint64_t skip = static_cast<uint64_t>(start_frame) * frame_bytes;
     if (skip > static_cast<uint64_t>(LONG_MAX)) {
         std::fclose(fp);
@@ -136,13 +136,13 @@ bool FrameMem::read_file(const std::string& file_path, uint32_t start_frame, uin
     if (planar8) {
         for (uint32_t f = 0; f < n; ++f) {
             for (uint32_t p = 0; p < 3; ++p) {
-                const size_t ps = info_.plane_samples(p);
+                const size_t ps = frame_info.plane_samples(p);
                 std::vector<uint8_t> tmp(ps);
                 if (std::fread(tmp.data(), 1, ps, fp) != ps) {
                     std::fclose(fp);
                     return false;
                 }
-                std::vector<uint16_t>& pv = planes_[p];
+                std::vector<uint16_t>& pv = planes[p];
                 const size_t base = static_cast<size_t>(f) * ps;
                 for (size_t k = 0; k < ps; ++k)
                     pv[base + k] = static_cast<uint16_t>(tmp[k]);
@@ -153,7 +153,7 @@ bool FrameMem::read_file(const std::string& file_path, uint32_t start_frame, uin
     }
     size_t total = 0;
     for (uint32_t p = 0; p < 3; ++p)
-        total += static_cast<size_t>(n) * info_.plane_samples(p);
+        total += static_cast<size_t>(n) * frame_info.plane_samples(p);
     const size_t need = total * sizeof(uint16_t);
     std::vector<uint8_t> buf(need);
     const size_t got = std::fread(buf.data(), 1, need, fp);
@@ -169,8 +169,8 @@ bool FrameMem::read_file(const std::string& file_path, uint32_t start_frame, uin
     size_t off = 0;
     for (uint32_t f = 0; f < n; ++f) {
         for (uint32_t p = 0; p < 3; ++p) {
-            std::vector<uint16_t>& pv = planes_[p];
-            const size_t ps = info_.plane_samples(p);
+            std::vector<uint16_t>& pv = planes[p];
+            const size_t ps = frame_info.plane_samples(p);
             const size_t base = static_cast<size_t>(f) * ps;
             for (size_t k = 0; k < ps; ++k)
                 pv[base + k] = rd(off);
@@ -181,17 +181,17 @@ bool FrameMem::read_file(const std::string& file_path, uint32_t start_frame, uin
 
 // Write YUV planar frames to file
 bool FrameMem::write_file(const std::string& file_path, bool append) const {
-    const bool planar8 = info_.color_depth == static_cast<uint32_t>(COLOR_DEPTH_8);
+    const bool planar8 = frame_info.color_depth == static_cast<uint32_t>(COLOR_DEPTH_8);
     const char* mode = append ? "ab" : "wb";
     FILE* fp = std::fopen(file_path.c_str(), mode);
     if (!fp)
         return false;
     if (planar8) {
         std::vector<uint8_t> tmp;
-        for (uint32_t f = 0; f < info_.frame_total; ++f) {
+        for (uint32_t f = 0; f < frame_info.frame_total; ++f) {
             for (uint32_t p = 0; p < 3; ++p) {
-                const std::vector<uint16_t>& pv = planes_[p];
-                const size_t ps = info_.plane_samples(p);
+                const std::vector<uint16_t>& pv = planes[p];
+                const size_t ps = frame_info.plane_samples(p);
                 const size_t base = static_cast<size_t>(f) * ps;
                 tmp.resize(ps);
                 for (size_t k = 0; k < ps; ++k)
@@ -205,10 +205,10 @@ bool FrameMem::write_file(const std::string& file_path, bool append) const {
         std::fclose(fp);
         return true;
     }
-    for (uint32_t f = 0; f < info_.frame_total; ++f) {
+    for (uint32_t f = 0; f < frame_info.frame_total; ++f) {
         for (uint32_t p = 0; p < 3; ++p) {
-            const std::vector<uint16_t>& pv = planes_[p];
-            const size_t ps = info_.plane_samples(p);
+            const std::vector<uint16_t>& pv = planes[p];
+            const size_t ps = frame_info.plane_samples(p);
             const size_t base = static_cast<size_t>(f) * ps;
             if (std::fwrite(pv.data() + base, sizeof(uint16_t), ps, fp) != ps) {
                 std::fclose(fp);
@@ -222,10 +222,10 @@ bool FrameMem::write_file(const std::string& file_path, bool append) const {
 
 // Read a line of samples from frame memory
 bool FrameMem::read_line(uint32_t frame_index, uint32_t plane_index, uint32_t y, std::vector<uint16_t>& line) const {
-    if (plane_index > 2 || frame_index >= info_.frame_total || y >= info_.plane_height(plane_index))
+    if (plane_index > 2 || frame_index >= frame_info.frame_total || y >= frame_info.plane_height(plane_index))
         return false;
-    const std::vector<uint16_t>& pv = planes_[plane_index];
-    const uint32_t pw = info_.plane_width(plane_index);
+    const std::vector<uint16_t>& pv = planes[plane_index];
+    const uint32_t pw = frame_info.plane_width(plane_index);
     line.resize(pw);
     const size_t ro = plane_offset(frame_index, plane_index, y, 0);
     for (uint32_t x = 0; x < pw; ++x)
@@ -235,12 +235,12 @@ bool FrameMem::read_line(uint32_t frame_index, uint32_t plane_index, uint32_t y,
 
 // Write a line of samples to frame memory
 bool FrameMem::write_line(uint32_t frame_index, uint32_t plane_index, uint32_t y, const std::vector<uint16_t>& data) {
-    if (plane_index > 2 || frame_index >= info_.frame_total || y >= info_.plane_height(plane_index))
+    if (plane_index > 2 || frame_index >= frame_info.frame_total || y >= frame_info.plane_height(plane_index))
         return false;
-    const uint32_t pw = info_.plane_width(plane_index);
+    const uint32_t pw = frame_info.plane_width(plane_index);
     if (data.size() < pw)
         return false;
-    std::vector<uint16_t>& pv = planes_[plane_index];
+    std::vector<uint16_t>& pv = planes[plane_index];
     const size_t ro = plane_offset(frame_index, plane_index, y, 0);
     for (uint32_t x = 0; x < pw; ++x)
         pv[ro + x] = data[x];
@@ -249,19 +249,19 @@ bool FrameMem::write_line(uint32_t frame_index, uint32_t plane_index, uint32_t y
 
 // Read a single pixel sample from frame memory
 uint16_t FrameMem::read_pixel(uint32_t frame_index, uint32_t plane_index, uint32_t x, uint32_t y) const {
-    if (plane_index > 2 || frame_index >= info_.frame_total || x >= info_.plane_width(plane_index) ||
-        y >= info_.plane_height(plane_index))
+    if (plane_index > 2 || frame_index >= frame_info.frame_total || x >= frame_info.plane_width(plane_index) ||
+        y >= frame_info.plane_height(plane_index))
         return 0;
-    const std::vector<uint16_t>& pv = planes_[plane_index];
+    const std::vector<uint16_t>& pv = planes[plane_index];
     return pv[plane_offset(frame_index, plane_index, y, x)];
 }
 
 // Write a single pixel sample to frame memory
 bool FrameMem::write_pixel(uint32_t frame_index, uint32_t plane_index, uint32_t x, uint32_t y, uint32_t value) {
-    if (plane_index > 2 || frame_index >= info_.frame_total || x >= info_.plane_width(plane_index) ||
-        y >= info_.plane_height(plane_index))
+    if (plane_index > 2 || frame_index >= frame_info.frame_total || x >= frame_info.plane_width(plane_index) ||
+        y >= frame_info.plane_height(plane_index))
         return false;
-    std::vector<uint16_t>& pv = planes_[plane_index];
+    std::vector<uint16_t>& pv = planes[plane_index];
     pv[plane_offset(frame_index, plane_index, y, x)] = static_cast<uint16_t>(value & 0xFFFFu);
     return true;
 }

@@ -21,16 +21,6 @@
  * @brief A simple logging utility class with color support and memory visualization.
  */
 class Log {
-private:
-    // Helper for formatting messages
-    void format_msg(std::stringstream&) {}
-
-    template<typename T, typename... Args>
-    void format_msg(std::stringstream& ss, const T& first, const Args&... args) {
-        ss << first;
-        format_msg(ss, args...);
-    }
-
 public:
     bool quiet = false;
 
@@ -133,6 +123,16 @@ public:
             }
             std::cout << std::dec << std::endl; // New line and reset to decimal
         }
+    }
+
+private:
+    // Helper for formatting messages
+    void format_msg(std::stringstream&) {}
+
+    template<typename T, typename... Args>
+    void format_msg(std::stringstream& ss, const T& first, const Args&... args) {
+        ss << first;
+        format_msg(ss, args...);
     }
 };
 #endif // LOG_HPP

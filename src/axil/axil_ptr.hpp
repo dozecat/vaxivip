@@ -18,9 +18,9 @@
 #ifndef AXIL_PTR_HPP
 #define AXIL_PTR_HPP
 
+#include "sig.hpp"
 #include <cstdint>
 #include <cstring>
-#include "sig.hpp"
 
 #ifndef RESP_TYPE_T
 #define RESP_TYPE_T

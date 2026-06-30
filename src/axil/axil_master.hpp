@@ -31,32 +31,6 @@ public:
     Log log;
     axil_master_ptr<DATA_WIDTH, ADDR_WIDTH> port;              ///< Interface signal pointers
 
-    std::queue<uint64_t> wr_data_q;         ///< Write data queue
-    std::queue<uint64_t> wr_addr_q;         ///< Write address queue
-    std::queue<uint64_t> rd_addr_q;         ///< Read address queue
-    std::queue<uint64_t> rd_data_q;         ///< Read data queue
-
-    bool wr_active;                         ///< Write transaction active flag
-    bool rd_active;                         ///< Read transaction active flag
-
-    // Handshake flags for delayed clearing
-    bool aw_hs, w_hs, b_hs, ar_hs, r_hs;
-
-    // Store address for logging
-    uint64_t current_wr_addr;
-    uint64_t current_wr_data;
-    uint64_t current_rd_addr;
-
-    // Registered inputs
-    bool awready_i;
-    bool wready_i;
-    bool bvalid_i;
-    uint8_t bresp_i;
-    bool arready_i;
-    bool rvalid_i;
-    uint64_t rdata_i;
-    uint8_t rresp_i;
-
     /// @brief Constructor
     axil_master(axil_master_ptr<DATA_WIDTH, ADDR_WIDTH> port) : port(port) {
         clear();
@@ -106,7 +80,30 @@ public:
         return true;
     }
 
-    // Internal helpers
+private:
+    std::queue<uint64_t> wr_data_q;
+    std::queue<uint64_t> wr_addr_q;
+    std::queue<uint64_t> rd_addr_q;
+    std::queue<uint64_t> rd_data_q;
+
+    bool wr_active;
+    bool rd_active;
+
+    bool aw_hs, w_hs, b_hs, ar_hs, r_hs;
+
+    uint64_t current_wr_addr;
+    uint64_t current_wr_data;
+    uint64_t current_rd_addr;
+
+    bool awready_i;
+    bool wready_i;
+    bool bvalid_i;
+    uint8_t bresp_i;
+    bool arready_i;
+    bool rvalid_i;
+    uint64_t rdata_i;
+    uint8_t rresp_i;
+
     void waddr_set(uint64_t addr) {
         *(port.awaddr)  = addr;
         *(port.awvalid) = true;

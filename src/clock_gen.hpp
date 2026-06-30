@@ -29,30 +29,6 @@
 
 template <vluint64_t TSTEP_PS = 10>
 class ClockGen {
-    vluint64_t half_period_ps = 0;
-    vluint64_t next_edge_ps   = 0;
-    CData*     signal         = nullptr;
-    int        cached_edge    = 0;
-    vluint64_t cached_time    = 0;
-
-    void eval(vluint64_t time_ps) {
-        vluint64_t t = (time_ps / TSTEP_PS) * TSTEP_PS;
-
-        if (cached_time == t) {
-            return;
-        }
-
-        cached_time = t;
-        if (t < next_edge_ps) {
-            cached_edge = 0;
-            return;
-        }
-
-        *signal = !(*signal);
-        next_edge_ps += half_period_ps;
-        cached_edge = *signal ? 1 : -1;
-    }
-
 public:
     ClockGen() = default;
 
@@ -79,6 +55,31 @@ public:
     bool edge(vluint64_t time_ps) {
         eval(time_ps);
         return cached_edge != 0;
+    }
+
+private:
+    vluint64_t half_period_ps = 0;
+    vluint64_t next_edge_ps   = 0;
+    CData*     signal         = nullptr;
+    int        cached_edge    = 0;
+    vluint64_t cached_time    = 0;
+
+    void eval(vluint64_t time_ps) {
+        vluint64_t t = (time_ps / TSTEP_PS) * TSTEP_PS;
+
+        if (cached_time == t) {
+            return;
+        }
+
+        cached_time = t;
+        if (t < next_edge_ps) {
+            cached_edge = 0;
+            return;
+        }
+
+        *signal = !(*signal);
+        next_edge_ps += half_period_ps;
+        cached_edge = *signal ? 1 : -1;
     }
 };
 

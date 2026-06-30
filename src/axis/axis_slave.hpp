@@ -32,18 +32,7 @@ template <
 class axis_slave {
 public:
     Log log;
-    std::vector<uint8_t> recv_buf;          ///< Buffer for currently receiving packet
-    std::queue<std::vector<uint8_t>> rx_queue;///< Queue of received packets
     axis_slave_ptr<DATA_WIDTH, ID_WIDTH, DEST_WIDTH, USER_WIDTH> port;        ///< Interface signal pointers
-
-    // Registered Input Signals
-    bool tready_i;
-    bool tready_o;
-    bool tvalid_i;
-    uint64_t tkeep_i;
-    bool tlast_i;
-    uint32_t tuser_i;
-    std::vector<uint8_t> tdata_i;
 
     /// @brief Constructor
     axis_slave(axis_slave_ptr<DATA_WIDTH, ID_WIDTH, DEST_WIDTH, USER_WIDTH> port):port(port) {
@@ -110,6 +99,17 @@ public:
         }
         *(port.tready) = tready_o;
     }
+
+private:
+    std::vector<uint8_t> recv_buf;
+    std::queue<std::vector<uint8_t>> rx_queue;
+    bool tready_i;
+    bool tready_o;
+    bool tvalid_i;
+    uint64_t tkeep_i;
+    bool tlast_i;
+    uint32_t tuser_i;
+    std::vector<uint8_t> tdata_i;
 };
 
 #endif

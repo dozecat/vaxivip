@@ -17,9 +17,9 @@
 
 #ifndef AXIS_PTR_HPP
 #define AXIS_PTR_HPP
+#include "sig.hpp"
 #include <cstdint>
 #include <cstring>
-#include "sig.hpp"
 
 /// @brief Check if all signal pointers are assigned and unique
 template <typename T>

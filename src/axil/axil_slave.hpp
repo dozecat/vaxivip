@@ -32,28 +32,6 @@ public:
     axil_slave_ptr<DATA_WIDTH, ADDR_WIDTH> port;              ///< Interface signal pointers
     std::map<uint64_t, uint64_t> mem;       ///< Memory storage
 
-    bool wr_addr_received;                  ///< Write address received flag
-    uint64_t wr_addr;                       ///< Received write address
-    bool wr_data_received;                  ///< Write data received flag
-    uint64_t wr_data;                       ///< Received write data
-    bool wr_resp_sent;                      ///< Write response sent flag
-
-    bool rd_addr_received;                  ///< Read address received flag
-    uint64_t rd_addr;                       ///< Received read address
-    bool rd_data_sent;                      ///< Read data sent flag
-    uint64_t rd_data_reg;                   ///< Read data register
-
-    // Registered Input Signals
-    bool awvalid_i;
-    uint64_t awaddr_i;
-    bool wvalid_i;
-    uint64_t wdata_i;
-    uint64_t wstrb_i;
-    bool bready_i;
-    bool arvalid_i;
-    uint64_t araddr_i;
-    bool rready_i;
-
     /// @brief Constructor
     axil_slave(axil_slave_ptr<DATA_WIDTH, ADDR_WIDTH> port) : port(port) {
         wr_addr_received = false;
@@ -157,6 +135,28 @@ public:
         *(port.rdata)   = rd_data_reg;
         *(port.rresp)   = OKAY;
     }
+
+private:
+    bool wr_addr_received;
+    uint64_t wr_addr;
+    bool wr_data_received;
+    uint64_t wr_data;
+    bool wr_resp_sent;
+
+    bool rd_addr_received;
+    uint64_t rd_addr;
+    bool rd_data_sent;
+    uint64_t rd_data_reg;
+
+    bool awvalid_i;
+    uint64_t awaddr_i;
+    bool wvalid_i;
+    uint64_t wdata_i;
+    uint64_t wstrb_i;
+    bool bready_i;
+    bool arvalid_i;
+    uint64_t araddr_i;
+    bool rready_i;
 };
 
 #endif
