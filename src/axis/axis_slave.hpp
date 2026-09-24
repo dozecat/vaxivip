@@ -19,8 +19,10 @@
 
 #include "axis_ptr.hpp"
 #include "log.hpp"
+#include <array>
 #include <cstring>
 #include <queue>
+#include <utility>
 
 /// @brief AXI4-Stream Slave BFM
 template <
@@ -58,7 +60,7 @@ public:
         if (rx_queue.empty()) {
             return -1;
         } else {
-            dst_buf = rx_queue.front();
+            dst_buf = std::move(rx_queue.front());
             rx_queue.pop();
             return dst_buf.size();
         }
@@ -76,17 +78,19 @@ public:
         tlast_i = *(port.tlast);
         tuser_i = *(port.tuser);
 
-        tdata_i.clear();
-        for (int i=0; i<DATA_WIDTH/8; i++) {
-             tdata_i.push_back(((char*)port.tdata)[i]);
-        }
+        std::memcpy(tdata_i.data(), (const char*)port.tdata, DATA_WIDTH/8);
     }
 
     void update_output() {
         if (tvalid_i && tready_i) {
-            for (int i=0;i<DATA_WIDTH/8;i++) {
-                if ((tkeep_i & ((uint64_t)1 << i)) != 0) {
-                    recv_buf.push_back(tdata_i[i]);
+            const uint64_t full = (DATA_WIDTH/8 >= 64) ? ~0ull : ((1ull << (DATA_WIDTH/8)) - 1ull);
+            if ((tkeep_i & full) == full) {
+                recv_buf.insert(recv_buf.end(), tdata_i.begin(), tdata_i.end());
+            } else {
+                for (uint32_t i=0;i<DATA_WIDTH/8;i++) {
+                    if ((tkeep_i & ((uint64_t)1 << i)) != 0) {
+                        recv_buf.push_back(tdata_i[i]);
+                    }
                 }
             }
             if (tlast_i) {
@@ -109,7 +113,7 @@ private:
     uint64_t tkeep_i;
     bool tlast_i;
     uint32_t tuser_i;
-    std::vector<uint8_t> tdata_i;
+    std::array<uint8_t, DATA_WIDTH/8> tdata_i{};
 };
 
 #endif

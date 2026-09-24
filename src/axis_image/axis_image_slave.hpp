@@ -54,6 +54,7 @@ public:
     axis_image_slave(const axis_slave_ptr<DATA_WIDTH, 1, 1, USER_WIDTH>& port)
         : axis_slv(port) {
         axis_slv.log.quiet = true;
+        log.quiet = true;
         image_info = &bmp.image_info;
         pixel_idx = 0;
         busy = false;
@@ -154,18 +155,22 @@ public:
             return;
         }
 
+        const uint32_t w = image_info->width;
         const uint32_t p0 = pixel_idx;
+        std::vector<uint32_t>& px = bmp.pixels();
+        uint32_t x = pixel_idx % w;
+        uint32_t y = pixel_idx / w;
         for (uint32_t off = 0; off + bpp - 1 < static_cast<uint32_t>(size) && pixel_idx < total_pixels;
              off += bpp) {
-            uint32_t x = pixel_idx % image_info->width;
-            uint32_t y = pixel_idx / image_info->width;
-            uint8_t  r = data[off + 0];
-            uint8_t  g = data[off + 1];
-            uint8_t  b = data[off + 2];
-            uint32_t color = (0xFFu << 24) | (static_cast<uint32_t>(r) << 16) |
-                             (static_cast<uint32_t>(g) << 8) | static_cast<uint32_t>(b);
-            bmp.set_pixel(x, y, color);
+            const uint32_t color = (0xFFu << 24) | (static_cast<uint32_t>(data[off + 0]) << 16) |
+                                   (static_cast<uint32_t>(data[off + 1]) << 8) |
+                                   static_cast<uint32_t>(data[off + 2]);
+            px[static_cast<size_t>(y) * w + x] = color;
             pixel_idx++;
+            if (++x == w) {
+                x = 0;
+                ++y;
+            }
         }
 
         const uint32_t consumed_b = (pixel_idx - p0) * bpp;

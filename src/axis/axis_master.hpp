@@ -19,8 +19,10 @@
 
 #include "axis_ptr.hpp"
 #include "log.hpp"
+#include <algorithm>
 #include <cstring>
 #include <queue>
+#include <utility>
 
 /// @brief AXI4-Stream Master BFM
 template <
@@ -68,8 +70,8 @@ public:
     /// @param dest Transaction Destination
     /// @param user Transaction User Data
     /// @param sof Assert TUSER[0] at Start of Frame
-    void send(const std::vector<uint8_t>& data, uint32_t id = 0, uint32_t dest = 0, uint32_t user = 0, bool sof = false) {
-        tx_queue.push(data);
+    void send(std::vector<uint8_t> data, uint32_t id = 0, uint32_t dest = 0, uint32_t user = 0, bool sof = false) {
+        tx_queue.push(std::move(data));
         tx_id_queue.push(id);
         tx_dest_queue.push(dest);
         tx_user_queue.push(user);
@@ -91,7 +93,7 @@ public:
             *(port.tvalid) = false;
             // start new transaction
             if (tx_buf.empty() && !tx_queue.empty()) {
-                tx_buf = tx_queue.front();
+                tx_buf = std::move(tx_queue.front());
                 tx_queue.pop();
 
                 if (!tx_id_queue.empty()) {
@@ -119,9 +121,6 @@ public:
                 tx_buf_idx = 0;
             }
             if (!tx_buf.empty()) {
-                // bool is_start = (tx_buf_idx == 0);
-                int byte_pos = 0;
-                *(port.tkeep) = 0;
                 *(port.tid) = tx_id;
                 *(port.tdest) = tx_dest;
                 // handle SOF on TUSER[0]
@@ -131,12 +130,11 @@ public:
                      *(port.tuser) = tx_user;
                 }
 
-                while (tx_buf_idx < tx_buf.size() && byte_pos < byte_width) {
-                    *(port.tkeep) = *(port.tkeep) | ((uint64_t)1 << byte_pos);
-                    ((char*)port.tdata)[byte_pos] = tx_buf[tx_buf_idx];
-                    tx_buf_idx++;
-                    byte_pos++;
-                }
+                const size_t remain = tx_buf.size() - tx_buf_idx;
+                const size_t n = std::min<size_t>(remain, static_cast<size_t>(byte_width));
+                std::memcpy((char*)port.tdata, tx_buf.data() + tx_buf_idx, n);
+                *(port.tkeep) = (n >= 64) ? ~0ull : ((1ull << n) - 1ull);
+                tx_buf_idx += n;
 
                 bool last = (tx_buf_idx >= tx_buf.size());
                 *(port.tlast) = last;

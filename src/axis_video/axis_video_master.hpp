@@ -114,13 +114,11 @@ public:
                  ", frame_num=", n);
 
         xfer_frame_total = n;
-        busy = false;
         lines_sent = 0;
+        next_frame = 0;
+        next_line = 0;
         done = false;
         end_of_frame = false;
-
-        for (uint32_t f = 0; f < n; ++f)
-            axis_pixel_pkg(f);
 
         busy = true;
         return true;
@@ -152,7 +150,21 @@ public:
             }
         }
 
-        if (axis_mst.tx_buf.empty() && axis_mst.tx_queue.empty())
+        // Feed the next line on demand instead of pre-queueing every frame.
+        // Keep exactly one line queued ahead (tx_queue) while the current line
+        // drains (tx_buf), so there is no gap between line packets.
+        while (next_frame < xfer_frame_total && axis_mst.tx_queue.empty()) {
+            std::vector<uint8_t> line_data;
+            pack_line(next_frame, next_line, line_data);
+            axis_mst.send(std::move(line_data), 0, 0, 0, next_line == 0);
+            ++next_line;
+            if (next_line >= frame_info.height) {
+                next_line = 0;
+                ++next_frame;
+            }
+        }
+
+        if (axis_mst.tx_buf.empty() && axis_mst.tx_queue.empty() && next_frame >= xfer_frame_total)
             busy = false;
     }
 
@@ -160,6 +172,9 @@ private:
     FrameMem frames;
     uint32_t lines_sent = 0;
     uint32_t xfer_frame_total = 0;
+    uint32_t next_frame = 0;
+    uint32_t next_line = 0;
+    std::vector<uint16_t> ly, lu, lv;
 
     uint16_t sample_to_axis(uint16_t sample) const {
         const uint32_t cd = frame_info.color_depth;
@@ -169,74 +184,72 @@ private:
 
     static void pack_beat(uint8_t* beat, const uint16_t* comp, uint32_t ncomp) {
         std::memset(beat, 0, DATA_WIDTH / 8u);
+        constexpr uint32_t mask = (BPC >= 32u) ? 0xFFFFFFFFu : ((1u << BPC) - 1u);
         for (uint32_t k = 0; k < ncomp; ++k) {
-            const uint32_t bit_off = k * BPC;
-            const uint32_t val = static_cast<uint32_t>(comp[k]) & ((1u << BPC) - 1u);
-            for (uint32_t i = 0; i < BPC; ++i) {
-                if ((val >> i) & 1u) {
-                    const uint32_t b = bit_off + i;
-                    beat[b / 8u] |= static_cast<uint8_t>(1u << (b % 8u));
-                }
-            }
+            const uint32_t val = static_cast<uint32_t>(comp[k]) & mask;
+            const uint32_t bit = k * BPC;
+            const uint32_t byi = bit >> 3;
+            const uint32_t sh = bit & 7u;
+            const uint32_t word = val << sh;
+            const uint32_t nbytes = (sh + BPC + 7u) >> 3;
+            for (uint32_t b = 0; b < nbytes; ++b)
+                beat[byi + b] |= static_cast<uint8_t>(word >> (8u * b));
         }
     }
 
-    void axis_pixel_pkg(uint32_t frame_index) {
+    void pack_line(uint32_t frame_index, uint32_t y, std::vector<uint8_t>& line_data) {
         constexpr uint32_t bytes_per_beat = DATA_WIDTH / 8u;
         constexpr uint32_t comp_per_beat = 3u * PPC;
-        for (uint32_t y = 0; y < frame_info.height; ++y) {
-            std::vector<uint16_t> ly, lu, lv;
-            frames.read_line(frame_index, 0, y, ly);
-            const uint32_t cy = (frame_info.pix_fmt == PIX_FMT_YUV420P) ? (y / 2u) : y;
-            frames.read_line(frame_index, 1, cy, lu);
-            frames.read_line(frame_index, 2, cy, lv);
-            const uint32_t nbeats = (frame_info.width + PPC - 1u) / PPC;
-            std::vector<uint8_t> line_data;
-            line_data.reserve(static_cast<size_t>(nbeats) * bytes_per_beat);
-            const AxisPixFmt afmt = frame_info.axis_pix_fmt();
-            const bool pack_yuyv = (afmt == AXIS_PIX_FMT_YUYV);
-            const uint32_t ncomp_pack = pack_yuyv ? (2u * PPC) : comp_per_beat;
-            std::vector<uint16_t> comp(ncomp_pack);
-            const bool chroma_line =
-                (frame_info.pix_fmt != PIX_FMT_YUV420P) || ((y & 1u) == 0u);
-            for (uint32_t b = 0; b < nbeats; ++b) {
-                if (pack_yuyv) {
-                    for (uint32_t pair = 0; pair < PPC / 2u; ++pair) {
-                        const uint32_t x0 = b * PPC + pair * 2u;
-                        const uint32_t x1 = x0 + 1u;
-                        const uint32_t cidx = x0 / 2u;
-                        const uint16_t y0 = x0 < frame_info.width ? ly[x0] : 0;
-                        const uint16_t y1 = x1 < frame_info.width ? ly[x1] : 0;
-                        const uint32_t base = pair * 4u;
-                        comp[base + 0u] = sample_to_axis(y0);
-                        comp[base + 2u] = sample_to_axis(y1);
-                        if (chroma_line) {
-                            const uint16_t uv = x0 < frame_info.width ? lu[cidx] : 0;
-                            const uint16_t vv = x0 < frame_info.width ? lv[cidx] : 0;
-                            comp[base + 1u] = sample_to_axis(uv);
-                            comp[base + 3u] = sample_to_axis(vv);
-                        } else {
-                            comp[base + 1u] = 0;
-                            comp[base + 3u] = 0;
-                        }
-                    }
-                } else {
-                    for (uint32_t p = 0; p < PPC; ++p) {
-                        const uint32_t x = b * PPC + p;
-                        const uint16_t yv = x < frame_info.width ? ly[x] : 0;
-                        const uint16_t uv = x < frame_info.width ? lu[x] : 0;
-                        const uint16_t vv = x < frame_info.width ? lv[x] : 0;
-                        comp[p * 3u + 0u] = sample_to_axis(yv);
-                        comp[p * 3u + 1u] = sample_to_axis(uv);
-                        comp[p * 3u + 2u] = sample_to_axis(vv);
+
+        frames.read_line(frame_index, 0, y, ly);
+        const uint32_t cy = (frame_info.pix_fmt == PIX_FMT_YUV420P) ? (y / 2u) : y;
+        frames.read_line(frame_index, 1, cy, lu);
+        frames.read_line(frame_index, 2, cy, lv);
+
+        const uint32_t nbeats = (frame_info.width + PPC - 1u) / PPC;
+        line_data.resize(static_cast<size_t>(nbeats) * bytes_per_beat);
+        const AxisPixFmt afmt = frame_info.axis_pix_fmt();
+        const bool pack_yuyv = (afmt == AXIS_PIX_FMT_YUYV);
+        const uint32_t ncomp_pack = pack_yuyv ? (2u * PPC) : comp_per_beat;
+        uint16_t comp[3u * 4u];
+        const bool chroma_line =
+            (frame_info.pix_fmt != PIX_FMT_YUV420P) || ((y & 1u) == 0u);
+        for (uint32_t b = 0; b < nbeats; ++b) {
+            if (pack_yuyv) {
+                for (uint32_t pair = 0; pair < PPC / 2u; ++pair) {
+                    const uint32_t x0 = b * PPC + pair * 2u;
+                    const uint32_t x1 = x0 + 1u;
+                    const uint32_t cidx = x0 / 2u;
+                    const uint16_t y0 = x0 < frame_info.width ? ly[x0] : 0;
+                    const uint16_t y1 = x1 < frame_info.width ? ly[x1] : 0;
+                    const uint32_t base = pair * 4u;
+                    comp[base + 0u] = sample_to_axis(y0);
+                    comp[base + 2u] = sample_to_axis(y1);
+                    if (chroma_line) {
+                        const uint16_t uv = x0 < frame_info.width ? lu[cidx] : 0;
+                        const uint16_t vv = x0 < frame_info.width ? lv[cidx] : 0;
+                        comp[base + 1u] = sample_to_axis(uv);
+                        comp[base + 3u] = sample_to_axis(vv);
+                    } else {
+                        comp[base + 1u] = 0;
+                        comp[base + 3u] = 0;
                     }
                 }
-                uint8_t beat[sizeof(uint64_t) * 4]{};
-                pack_beat(beat, comp.data(), ncomp_pack);
-                for (uint32_t i = 0; i < bytes_per_beat; ++i)
-                    line_data.push_back(beat[i]);
+            } else {
+                for (uint32_t p = 0; p < PPC; ++p) {
+                    const uint32_t x = b * PPC + p;
+                    const uint16_t yv = x < frame_info.width ? ly[x] : 0;
+                    const uint16_t uv = x < frame_info.width ? lu[x] : 0;
+                    const uint16_t vv = x < frame_info.width ? lv[x] : 0;
+                    comp[p * 3u + 0u] = sample_to_axis(yv);
+                    comp[p * 3u + 1u] = sample_to_axis(uv);
+                    comp[p * 3u + 2u] = sample_to_axis(vv);
+                }
             }
-            axis_mst.send(line_data, 0, 0, 0, y == 0);
+            uint8_t beat[sizeof(uint64_t) * 4];
+            pack_beat(beat, comp, ncomp_pack);
+            std::memcpy(line_data.data() + static_cast<size_t>(b) * bytes_per_beat,
+                        beat, bytes_per_beat);
         }
     }
 };

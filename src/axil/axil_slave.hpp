@@ -19,7 +19,7 @@
 
 #include "axil_ptr.hpp"
 #include "log.hpp"
-#include <map>
+#include <unordered_map>
 
 /// @brief AXI4-Lite Slave BFM
 template <
@@ -30,7 +30,7 @@ class axil_slave {
 public:
     Log log;
     axil_slave_ptr<DATA_WIDTH, ADDR_WIDTH> port;              ///< Interface signal pointers
-    std::map<uint64_t, uint64_t> mem;       ///< Memory storage
+    std::unordered_map<uint64_t, uint64_t> mem;       ///< Memory storage
 
     /// @brief Constructor
     axil_slave(axil_slave_ptr<DATA_WIDTH, ADDR_WIDTH> port) : port(port) {
@@ -110,8 +110,9 @@ public:
         // Read Data
         if (rd_addr_received && !rd_data_sent) {
             uint64_t rdata = 0;
-            if (mem.count(rd_addr)) {
-                rdata = mem[rd_addr];
+            auto it = mem.find(rd_addr);
+            if (it != mem.end()) {
+                rdata = it->second;
             }
             log.info("[AXIL-SLV] RD success !");
             log.info("ADDR:0x", std::hex, rd_addr, "  DATA:0x", rdata);

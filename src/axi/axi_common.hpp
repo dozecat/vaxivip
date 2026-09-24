@@ -40,6 +40,7 @@ void signal_set(T* sig, const std::vector<uint8_t>& data, size_t start_byte, siz
 template <typename T>
 void signal_get(const T* sig, std::vector<uint8_t>& data, size_t num_bytes) {
     uint64_t val = *sig;
+    data.reserve(data.size() + num_bytes);
     for (size_t i = 0; i < num_bytes; ++i) {
         data.push_back((val >> (i * 8)) & 0xFF);
     }
@@ -71,6 +72,7 @@ void signal_set(VlWide<W>* sig, const std::vector<uint8_t>& data, size_t start_b
 template <std::size_t W>
 void signal_get(const VlWide<W>* sig, std::vector<uint8_t>& data, size_t num_bytes) {
     int N = sizeof((*sig).m_storage) / sizeof(uint32_t);
+    data.reserve(data.size() + num_bytes);
     for (size_t i = 0; i < num_bytes; ++i) {
         int w = i / 4;
         int b = i % 4;

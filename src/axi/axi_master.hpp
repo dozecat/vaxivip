@@ -22,6 +22,7 @@
 #include "log.hpp"
 #include <queue>
 #include <type_traits>
+#include <utility>
 
 /// @brief AXI Master BFM
 template <
@@ -73,46 +74,46 @@ public:
     /// @brief Write data using FIXED burst type
     /// @param addr Start address
     /// @param data Data to write
-    void write_fixed(uint64_t addr, const std::vector<uint8_t>& data, uint32_t id = 0) {
+    void write_fixed(uint64_t addr, std::vector<uint8_t> data, uint32_t id = 0) {
         if (data.empty()) return;
         write_trans t;
         t.addr = addr;
-        t.data = data;
         size_t bytes_per_beat = DATA_WIDTH/8;
         t.len = (data.size() + bytes_per_beat - 1) / bytes_per_beat - 1;
         t.burst = 0; // FIXED
         t.id = id;
-        wr_q.push(t);
+        t.data = std::move(data);
+        wr_q.push(std::move(t));
     }
 
     /// @brief Write data using INCR burst type
     /// @param addr Start address
     /// @param data Data to write
-    void write_incr(uint64_t addr, const std::vector<uint8_t>& data, uint32_t id = 0) {
+    void write_incr(uint64_t addr, std::vector<uint8_t> data, uint32_t id = 0) {
         if (data.empty()) return;
         write_trans t;
         t.addr = addr;
-        t.data = data;
         size_t bytes_per_beat = DATA_WIDTH/8;
         t.len = (data.size() + bytes_per_beat - 1) / bytes_per_beat - 1;
         t.burst = 1; // INCR
         t.id = id;
-        wr_q.push(t);
+        t.data = std::move(data);
+        wr_q.push(std::move(t));
     }
 
     /// @brief Write data using WRAP burst type
     /// @param addr Start address
     /// @param data Data to write
-    void write_wrap(uint64_t addr, const std::vector<uint8_t>& data, uint32_t id = 0) {
+    void write_wrap(uint64_t addr, std::vector<uint8_t> data, uint32_t id = 0) {
         if (data.empty()) return;
         write_trans t;
         t.addr = addr;
-        t.data = data;
         size_t bytes_per_beat = DATA_WIDTH/8;
         t.len = (data.size() + bytes_per_beat - 1) / bytes_per_beat - 1;
         t.burst = 2; // WRAP
         t.id = id;
-        wr_q.push(t);
+        t.data = std::move(data);
+        wr_q.push(std::move(t));
     }
 
     /// @brief Request a read transaction (FIXED)
@@ -168,7 +169,7 @@ public:
     /// @return true if data available
     bool get_read_data(std::vector<uint8_t> &data) {
         if (rd_data_q.empty()) return false;
-        data = rd_data_q.front();
+        data = std::move(rd_data_q.front());
         rd_data_q.pop();
         return true;
     }
@@ -279,9 +280,9 @@ public:
                 if (!r_hs) {
                     if (rvalid_i && *(port.rready)) {
                         size_t bytes_per_beat = DATA_WIDTH/8;
-                        std::vector<uint8_t> beat_data;
-                        signal_get(&rdata_i, beat_data, bytes_per_beat);
-                        current_rd_burst.insert(current_rd_burst.end(), beat_data.begin(), beat_data.end());
+                        beat_buf.clear();
+                        signal_get(&rdata_i, beat_buf, bytes_per_beat);
+                        current_rd_burst.insert(current_rd_burst.end(), beat_buf.begin(), beat_buf.end());
 
                         if (rlast_i) {
                             r_hs = true;
@@ -290,7 +291,6 @@ public:
                                 current_rd_burst.resize(t.size);
                             }
 
-                            rd_data_q.push(current_rd_burst);
                             log.info("[AXI-MST] ", burst_to_string(t.burst), " RD success !");
 
                             log.info("ADDR:0x", std::hex, t.addr,
@@ -299,6 +299,7 @@ public:
                                       "  ID:0x", std::hex, t.id);
                             log.hexdump(current_rd_burst, t.addr);
 
+                            rd_data_q.push(std::move(current_rd_burst));
                             rdata_clr();
                             rd_active = false;
                             rd_q.pop();
@@ -330,6 +331,7 @@ private:
     std::queue<read_trans> rd_q;
     std::queue<std::vector<uint8_t>> rd_data_q;
     std::vector<uint8_t> current_rd_burst;
+    std::vector<uint8_t> beat_buf;
 
     bool wr_active;
     bool rd_active;

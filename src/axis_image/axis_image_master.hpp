@@ -61,6 +61,7 @@ public:
     axis_image_master(const axis_master_ptr<DATA_WIDTH, 1, 1, USER_WIDTH>& port)
         : axis_mst(port) {
         axis_mst.log.quiet = true;
+        log.quiet = true;
         image_info = &bmp.image_info;
     }
 
@@ -87,7 +88,7 @@ public:
             info->width = image_info->width;
             info->height = image_info->height;
         }
-        axis_pixel_pkg();
+        next_line = 0;
         sending = true;
     }
 
@@ -112,7 +113,18 @@ public:
     void update_output() {
         axis_mst.update_output();
         if (!sending) return;
-        if (axis_mst.tx_buf.empty() && axis_mst.tx_queue.empty()) {
+
+        // Feed image lines on demand instead of pre-queueing the whole frame.
+        // Keep one line queued ahead so consecutive line packets have no gap.
+        while (next_line < image_info->height && axis_mst.tx_queue.empty()) {
+            std::vector<uint8_t> line_data;
+            pack_line(next_line, line_data);
+            axis_mst.send(std::move(line_data), 0, 0, 0, next_line == 0);
+            ++next_line;
+        }
+
+        if (next_line >= image_info->height &&
+            axis_mst.tx_buf.empty() && axis_mst.tx_queue.empty()) {
             sending = false;
             log.info("[IMAGE-MST] Image send complete. Resolution=",
                      image_info->width, "x", image_info->height);
@@ -131,53 +143,45 @@ private:
 
     static void pack_beat(uint8_t* beat, const uint16_t* comp, uint32_t ncomp) {
         std::memset(beat, 0, BYTES_PER_BEAT);
+        constexpr uint32_t mask = (BPC >= 32u) ? 0xFFFFFFFFu : ((1u << BPC) - 1u);
         for (uint32_t k = 0; k < ncomp; ++k) {
-            const uint32_t bit_off = k * BPC;
-            const uint32_t val = static_cast<uint32_t>(comp[k]) & ((1u << BPC) - 1u);
-            for (uint32_t i = 0; i < BPC; ++i) {
-                if ((val >> i) & 1u) {
-                    const uint32_t b = bit_off + i;
-                    beat[b / 8u] |= static_cast<uint8_t>(1u << (b % 8u));
-                }
-            }
+            const uint32_t val = static_cast<uint32_t>(comp[k]) & mask;
+            const uint32_t bit = k * BPC;
+            const uint32_t byi = bit >> 3;
+            const uint32_t sh = bit & 7u;
+            const uint32_t word = val << sh;
+            const uint32_t nbytes = (sh + BPC + 7u) >> 3;
+            for (uint32_t b = 0; b < nbytes; ++b)
+                beat[byi + b] |= static_cast<uint8_t>(word >> (8u * b));
         }
     }
 
-    /// @brief Enqueue all image lines as AXI4-Stream transactions
-    void axis_pixel_pkg() {
-        if (image_info->width == 0 || image_info->height == 0) return;
+    uint32_t next_line = 0;
 
-        for (uint32_t y = 0; y < image_info->height; y++) {
-            const uint32_t nbeats = (image_info->width + PPC - 1u) / PPC;
-            std::vector<uint8_t> line_data;
-            line_data.reserve(nbeats * BYTES_PER_BEAT);
+    /// @brief Pack a single image line into an AXI4-Stream packet
+    void pack_line(uint32_t y, std::vector<uint8_t>& line_data) {
+        const uint32_t nbeats = (image_info->width + PPC - 1u) / PPC;
+        line_data.resize(static_cast<size_t>(nbeats) * BYTES_PER_BEAT);
 
-            std::vector<uint16_t> comp(COMP_PER_BEAT);
-            for (uint32_t b = 0; b < nbeats; b++) {
-                for (uint32_t p = 0; p < PPC; p++) {
-                    const uint32_t x = b * PPC + p;
-                    if (x < image_info->width) {
-                        uint32_t pixel = bmp.get_pixel(x, y);
-                        uint8_t r = (pixel >> 16) & 0xFF;
-                        uint8_t g = (pixel >> 8) & 0xFF;
-                        uint8_t b_val = pixel & 0xFF;
-                        comp[p * 3u + 0u] = sample_to_axis(r);
-                        comp[p * 3u + 1u] = sample_to_axis(g);
-                        comp[p * 3u + 2u] = sample_to_axis(b_val);
-                    } else {
-                        comp[p * 3u + 0u] = 0;
-                        comp[p * 3u + 1u] = 0;
-                        comp[p * 3u + 2u] = 0;
-                    }
+        uint16_t comp[3u * 4u];
+        for (uint32_t b = 0; b < nbeats; b++) {
+            for (uint32_t p = 0; p < PPC; p++) {
+                const uint32_t x = b * PPC + p;
+                if (x < image_info->width) {
+                    const uint32_t pixel = bmp.get_pixel(x, y);
+                    comp[p * 3u + 0u] = sample_to_axis(static_cast<uint8_t>((pixel >> 16) & 0xFF));
+                    comp[p * 3u + 1u] = sample_to_axis(static_cast<uint8_t>((pixel >> 8) & 0xFF));
+                    comp[p * 3u + 2u] = sample_to_axis(static_cast<uint8_t>(pixel & 0xFF));
+                } else {
+                    comp[p * 3u + 0u] = 0;
+                    comp[p * 3u + 1u] = 0;
+                    comp[p * 3u + 2u] = 0;
                 }
-                uint8_t beat[sizeof(uint64_t) * 4]{};
-                pack_beat(beat, comp.data(), COMP_PER_BEAT);
-                for (uint32_t i = 0; i < BYTES_PER_BEAT; i++)
-                    line_data.push_back(beat[i]);
             }
-
-            bool sof = (y == 0);
-            axis_mst.send(line_data, 0, 0, 0, sof);
+            uint8_t beat[sizeof(uint64_t) * 4];
+            pack_beat(beat, comp, COMP_PER_BEAT);
+            std::memcpy(line_data.data() + static_cast<size_t>(b) * BYTES_PER_BEAT,
+                        beat, BYTES_PER_BEAT);
         }
     }
 };

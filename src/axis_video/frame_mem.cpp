@@ -134,10 +134,11 @@ bool FrameMem::read_file(const std::string& file_path, uint32_t start_frame, uin
         return false;
     }
     if (planar8) {
+        std::vector<uint8_t> tmp;
         for (uint32_t f = 0; f < n; ++f) {
             for (uint32_t p = 0; p < 3; ++p) {
                 const size_t ps = frame_info.plane_samples(p);
-                std::vector<uint8_t> tmp(ps);
+                tmp.resize(ps);
                 if (std::fread(tmp.data(), 1, ps, fp) != ps) {
                     std::fclose(fp);
                     return false;

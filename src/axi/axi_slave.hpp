@@ -20,7 +20,7 @@
 #include "axi_ptr.hpp"
 #include "axi_common.hpp"
 #include "log.hpp"
-#include <map>
+#include <unordered_map>
 
 /// @brief AXI Slave BFM
 template <
@@ -33,7 +33,7 @@ public:
     Log log;
     axi_slave_ptr<DATA_WIDTH, ADDR_WIDTH, ID_WIDTH> port;
 
-    std::map<uint64_t, uint8_t> mem; // Byte-addressable memory
+    std::unordered_map<uint64_t, uint8_t> mem; // Byte-addressable memory
 
     /// @brief Constructor
     /// @param port Interface signals pointer
@@ -178,19 +178,19 @@ public:
                     size_t bytes_per_beat = DATA_WIDTH/8;
                     uint64_t base_addr = get_addr(aw_addr, w_beat_count, aw_len, aw_burst, bytes_per_beat);
 
-                    std::vector<uint8_t> beat_data;
-                    signal_get(&wdata_i, beat_data, bytes_per_beat);
+                    beat_buf.clear();
+                    signal_get(&wdata_i, beat_buf, bytes_per_beat);
 
                     // Get strobes
-                    std::vector<uint8_t> strb_vec;
+                    strb_buf.clear();
                     size_t strb_width_bytes = (bytes_per_beat + 7) / 8;
-                    signal_get(&wstrb_i, strb_vec, strb_width_bytes);
+                    signal_get(&wstrb_i, strb_buf, strb_width_bytes);
 
                     for (size_t i=0; i<bytes_per_beat; i++) {
-                        bool strb_bit = (strb_vec[i/8] >> (i%8)) & 1;
+                        bool strb_bit = (strb_buf[i/8] >> (i%8)) & 1;
                         if (strb_bit) {
-                            w_data_accum.push_back(beat_data[i]);
-                            mem[base_addr + i] = beat_data[i];
+                            w_data_accum.push_back(beat_buf[i]);
+                            mem[base_addr + i] = beat_buf[i];
                         }
                     }
 
@@ -269,18 +269,15 @@ public:
 
             uint64_t current_addr = get_addr(ar_addr, r_beat_count, ar_len, ar_burst, bytes_per_beat);
 
-            std::vector<uint8_t> beat_data;
-            beat_data.reserve(bytes_per_beat);
+            beat_buf.clear();
+            beat_buf.reserve(bytes_per_beat);
 
             for (size_t i=0; i<bytes_per_beat; i++) {
-                if (mem.find(current_addr + i) != mem.end()) {
-                    beat_data.push_back(mem[current_addr + i]);
-                } else {
-                    beat_data.push_back(0);
-                }
+                auto it = mem.find(current_addr + i);
+                beat_buf.push_back(it != mem.end() ? it->second : 0);
             }
 
-            signal_set(port.rdata, beat_data, 0, bytes_per_beat);
+            signal_set(port.rdata, beat_buf, 0, bytes_per_beat);
 
             *(port.rvalid) = true;
             *(port.rresp) = 0; // OKAY
@@ -311,6 +308,8 @@ private:
     uint8_t ar_burst;
     uint32_t r_beat_count;
     std::vector<uint8_t> r_data_accum;
+    std::vector<uint8_t> beat_buf;
+    std::vector<uint8_t> strb_buf;
 
     sig_t(ADDR_WIDTH-1, 0) awaddr_i;
     uint8_t awburst_i;

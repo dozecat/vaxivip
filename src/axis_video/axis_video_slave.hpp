@@ -24,6 +24,7 @@
 #include "frame_mem.hpp"
 #include "log.hpp"
 #include "axis_video_format.hpp"
+#include <cstdio>
 #include <string>
 #include <vector>
 
@@ -282,14 +283,15 @@ public:
 
 private:
     static uint16_t unpack_comp(const uint8_t* beat, uint32_t comp_idx) {
-        const uint32_t bit_off = comp_idx * BPC;
-        uint16_t v = 0;
-        for (uint32_t i = 0; i < BPC; ++i) {
-            const uint32_t b = bit_off + i;
-            if (beat[b / 8u] & static_cast<uint8_t>(1u << (b % 8u)))
-                v |= static_cast<uint16_t>(1u << i);
-        }
-        return v;
+        constexpr uint32_t mask = (BPC >= 16u) ? 0xFFFFu : ((1u << BPC) - 1u);
+        const uint32_t bit = comp_idx * BPC;
+        const uint32_t byi = bit >> 3;
+        const uint32_t sh = bit & 7u;
+        const uint32_t nbytes = (sh + BPC + 7u) >> 3;
+        uint32_t word = 0;
+        for (uint32_t b = 0; b < nbytes; ++b)
+            word |= static_cast<uint32_t>(beat[byi + b]) << (8u * b);
+        return static_cast<uint16_t>((word >> sh) & mask);
     }
 
     uint16_t axis_to_sample(uint16_t v) const {
@@ -298,82 +300,59 @@ private:
         return static_cast<uint16_t>((static_cast<uint32_t>(v) >> (BPC - cd)) & mask);
     }
 
-    bool write_received_frame(const std::string& filename, bool append) {
-        FrameInfo fi{};
-        fi.pix_fmt = frame_info.pix_fmt;
-        fi.width = frame_info.width;
-        fi.height = frame_info.height;
-        fi.color_depth = frame_info.color_depth;
-        fi.frame_total = 1;
-        FrameMem fm;
-        if (!fm.init(fi)) {
-            log.error("axis_video_slave write_received_frame: FrameMem init failed");
-            return false;
-        }
-        std::vector<uint16_t> row(static_cast<size_t>(frame_info.width));
-        for (uint32_t y = 0; y < frame_info.height; ++y) {
-            for (uint32_t x = 0; x < frame_info.width; ++x)
-                row[x] = static_cast<uint16_t>(y_plane[static_cast<size_t>(y) * frame_info.width + x]);
-            if (!fm.write_line(0, 0, y, row)) {
-                log.error("axis_video_slave write_received_frame: write_line Y failed, y=", y);
-                return false;
+    /// Write one plane to file, optionally subsampling horizontally (sub_x) and
+    /// taking only every row_step-th source row (for 4:2:0 chroma).
+    bool write_plane(FILE* fp, const std::vector<uint16_t>& pl, uint32_t pw, uint32_t ph,
+                     uint32_t sub_x, uint32_t row_step, bool planar8) {
+        const uint32_t w = frame_info.width;
+        if (planar8) {
+            tmp8.resize(pw);
+            for (uint32_t r = 0; r < ph; ++r) {
+                const size_t srow = static_cast<size_t>(r) * row_step * w;
+                for (uint32_t x = 0; x < pw; ++x)
+                    tmp8[x] = static_cast<uint8_t>(pl[srow + static_cast<size_t>(x) * sub_x] & 0xFFu);
+                if (std::fwrite(tmp8.data(), 1, pw, fp) != pw)
+                    return false;
             }
-            if (frame_info.pix_fmt == PIX_FMT_YUV422P) {
-                const uint32_t cw = frame_info.width / 2u;
-                row.resize(cw);
-                for (uint32_t x = 0; x < cw; ++x)
-                    row[x] = static_cast<uint16_t>(u_plane[static_cast<size_t>(y) * frame_info.width + (x * 2u)]);
-                if (!fm.write_line(0, 1, y, row)) {
-                    log.error("axis_video_slave write_received_frame: write_line U failed, y=", y);
+        } else {
+            tmp16.resize(pw);
+            for (uint32_t r = 0; r < ph; ++r) {
+                const size_t srow = static_cast<size_t>(r) * row_step * w;
+                for (uint32_t x = 0; x < pw; ++x)
+                    tmp16[x] = pl[srow + static_cast<size_t>(x) * sub_x];
+                if (std::fwrite(tmp16.data(), sizeof(uint16_t), pw, fp) != pw)
                     return false;
-                }
-                for (uint32_t x = 0; x < cw; ++x)
-                    row[x] = static_cast<uint16_t>(v_plane[static_cast<size_t>(y) * frame_info.width + (x * 2u)]);
-                if (!fm.write_line(0, 2, y, row)) {
-                    log.error("axis_video_slave write_received_frame: write_line V failed, y=", y);
-                    return false;
-                }
-                row.resize(frame_info.width);
-            } else if (frame_info.pix_fmt == PIX_FMT_YUV420P) {
-                // write chroma only on even luma lines (chroma has half height)
-                if ((y & 1u) == 0u) {
-                    const uint32_t cy = y / 2u;
-                    const uint32_t cw = frame_info.width / 2u;
-                    row.resize(cw);
-                    for (uint32_t x = 0; x < cw; ++x)
-                        row[x] = static_cast<uint16_t>(u_plane[static_cast<size_t>(y) * frame_info.width + (x * 2u)]);
-                    if (!fm.write_line(0, 1, cy, row)) {
-                        log.error("axis_video_slave write_received_frame: write_line U failed, y=", y);
-                        return false;
-                    }
-                    for (uint32_t x = 0; x < cw; ++x)
-                        row[x] = static_cast<uint16_t>(v_plane[static_cast<size_t>(y) * frame_info.width + (x * 2u)]);
-                    if (!fm.write_line(0, 2, cy, row)) {
-                        log.error("axis_video_slave write_received_frame: write_line V failed, y=", y);
-                        return false;
-                    }
-                    row.resize(frame_info.width);
-                }
-            } else {
-                for (uint32_t x = 0; x < frame_info.width; ++x)
-                    row[x] = static_cast<uint16_t>(u_plane[static_cast<size_t>(y) * frame_info.width + x]);
-                if (!fm.write_line(0, 1, y, row)) {
-                    log.error("axis_video_slave write_received_frame: write_line U failed, y=", y);
-                    return false;
-                }
-                for (uint32_t x = 0; x < frame_info.width; ++x)
-                    row[x] = static_cast<uint16_t>(v_plane[static_cast<size_t>(y) * frame_info.width + x]);
-                if (!fm.write_line(0, 2, y, row)) {
-                    log.error("axis_video_slave write_received_frame: write_line V failed, y=", y);
-                    return false;
-                }
             }
-        }
-        if (!fm.write_file(filename, append)) {
-            log.error("axis_video_slave write_received_frame: FrameMem write_file failed, file=", filename);
-            return false;
         }
         return true;
+    }
+
+    bool write_received_frame(const std::string& filename, bool append) {
+        const uint32_t w = frame_info.width;
+        const uint32_t h = frame_info.height;
+        if (w == 0 || h == 0)
+            return false;
+        FILE* fp = std::fopen(filename.c_str(), append ? "ab" : "wb");
+        if (!fp) {
+            log.error("axis_video_slave write_received_frame: cannot open file, file=", filename);
+            return false;
+        }
+        const bool planar8 = frame_info.color_depth == static_cast<uint32_t>(COLOR_DEPTH_8);
+        bool ok = write_plane(fp, y_plane, w, h, 1, 1, planar8);
+        if (ok) {
+            if (frame_info.pix_fmt == PIX_FMT_YUV422P) {
+                ok = write_plane(fp, u_plane, w / 2u, h, 2, 1, planar8) &&
+                     write_plane(fp, v_plane, w / 2u, h, 2, 1, planar8);
+            } else if (frame_info.pix_fmt == PIX_FMT_YUV420P) {
+                ok = write_plane(fp, u_plane, w / 2u, h / 2u, 2, 2, planar8) &&
+                     write_plane(fp, v_plane, w / 2u, h / 2u, 2, 2, planar8);
+            } else {
+                ok = write_plane(fp, u_plane, w, h, 1, 1, planar8) &&
+                     write_plane(fp, v_plane, w, h, 1, 1, planar8);
+            }
+        }
+        std::fclose(fp);
+        return ok;
     }
 
     void start_recv_frame() {
@@ -388,6 +367,8 @@ private:
     std::vector<uint16_t> y_plane;
     std::vector<uint16_t> u_plane;
     std::vector<uint16_t> v_plane;
+    std::vector<uint8_t> tmp8;
+    std::vector<uint16_t> tmp16;
 };
 
 #endif
